@@ -42,12 +42,12 @@ empty_list = []
 for commit in repo.get_commits():
     real_date = commit.commit.author.date - timedelta(hours=2)
     all_commit_count[real_date.date()].append(commit.commit)
-    # for saved_commit in all_commit_count[real_date.date()]:
-    #     if "Merge" in saved_commit.message or "Merging" in saved_commit.message:
-    #         all_commit_count[real_date.date()].remove(saved_commit)
+    for saved_commit in all_commit_count[real_date.date()]:
+        if "Merge" in saved_commit.message or "Merging" in saved_commit.message:
+            all_commit_count[real_date.date()].remove(saved_commit)
     if commit.commit.message.count("Signed-off-by:") > 1 or (commit.commit.message.count("Signed-off-by:") == 1 and
             commit.commit.author.email not in commit.commit.message) or ((commit.commit.author.email != commit.commit.committer.email) and ("noreply@github.com" not in commit.commit.committer.email)):
-            # or (commit.commit.author.email != commit.commit.committer.email)
+            # or (commit.commit.authoremail.email != commit.commit.committer.email)
         # print(real_date.date())
         # print(commit.commit.message)
         # print("******")
@@ -123,4 +123,4 @@ trace1 = Scatter(
 )
 data = Data([trace0, trace1])
 
-py.plot(data, filename = 'signed-off-by whitout merges')
+py.iplot(data, filename = 'signed-off-by whitout merges')
