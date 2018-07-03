@@ -1,0 +1,12 @@
+2018:
+
+{'Reabilitacao-Motora': 1176,
+'Cardinals': 616,
+'TropicalHazards': 1112,
+'Nexte': 1824,
+'Dr-Down': 1863,
+'Gerencia_mais': 861,
+'VoxPop': 851,
+'Lacos-da-Alegria': 871,
+'IncluCare': 507,
+'Dulce': 3032}
