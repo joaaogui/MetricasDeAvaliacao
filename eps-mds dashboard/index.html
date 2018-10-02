@@ -1,0 +1,202 @@
+<head>
+  <title>EPS - MDS</title>
+  <script src="octokit-rest.js"></script>
+  <script src="plotly-latest.min.js"></script>
+  <script src="pycollections.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/lodash@4.17.11/lodash.min.js" integrity="sha256-7/yoZS3548fXSRXqc/xYzjsmuW3sFKzuvOCHd06Pmps=" crossorigin="anonymous"></script>
+  <script src="https://code.jquery.com/jquery-3.3.1.js" integrity="sha256-2Kok7MbOyxpgUVvAk/HJ2jigOSYS2auK4Pfzbm7uH60=" crossorigin="anonymous"></script>
+  <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/css/bootstrap.min.css" integrity="sha384-MCw98/SFnGE8fJT3GXwEOngsV7Zt27NXFoaoApmYm81iuXoPkFOJwJ8ERdknLPMO" crossorigin="anonymous">
+  <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/js/bootstrap.min.js" integrity="sha384-ChfqqxuZUCnJSK3+MXmPNIyE6ZbWh2IMqE241rYiqJxyMiZ6OW/JmZQ5stwEULTy" crossorigin="anonymous"></script>
+
+</head>
+
+<body>
+  <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+  <div class="collapse navbar-collapse" id="navbarSupportedContent">
+    <ul class="navbar-nav mr-auto" id="repos">
+    </ul>
+  </div>
+</nav>
+
+  <!-- <ul id="repos">
+
+  </ul> -->
+  <div class="col-lg" id="tester" style="width:100%;height:80%;"></div>
+
+</body>
+
+<script type="text/javascript">
+  const octokit = new Octokit()
+
+  octokit.authenticate({
+    type: 'oauth',
+    token: '9324fedffc85017817ff2533e9237fc81fc611a9'
+  })
+
+  $("#repos").on("click", "li", function(e) {
+    getCommits("2018.2-" + $(this).text())
+  });
+
+  async function paginateRepos(method) {
+    let response = await method({
+      org: "fga-eps-mds",
+      per_page: 100
+    })
+    let {
+      data
+    } = response
+    var count = 0;
+    while (octokit.hasNextPage(response)) {
+      count++;
+      response = await octokit.getNextPage(response)
+      data = data.concat(response.data)
+    }
+    return data
+  }
+
+  paginateRepos(octokit.repos.getForOrg)
+    .then(data => {
+      data.forEach(function(repo) {
+        if (!repo.name.includes("2018.2")) {
+          return;
+        }
+        var items = [];
+        var itemId = repo.name.substring(7, repo.name.length);
+        console.log(itemId)
+        items.push('<li><a style="color:white;font-size:16px; cursor: pointer;">' + itemId + '</a></li> ');
+        $('#repos').append(items.join(''));
+      })
+    })
+
+  function getCommits(repoName) {
+    async function paginateCommits(method) {
+      let response = await method({
+        repo: repoName,
+        owner: "fga-eps-mds"
+      })
+      let {
+        data
+      } = response
+      var count = 0;
+      while (octokit.hasNextPage(response)) {
+        count++;
+        response = await octokit.getNextPage(response)
+        data = data.concat(response.data)
+      }
+      return data
+    }
+
+    paginateCommits(octokit.repos.getCommits).then(data => {
+      // console.log(data)
+      calculatePair(data, repoName)
+    })
+  }
+
+
+  function occurrences(string, subString, allowOverlapping) {
+    string += "";
+    subString += "";
+    if (subString.length <= 0) return (string.length + 1);
+
+    var n = 0,
+      pos = 0,
+      step = allowOverlapping ? 1 : subString.length;
+
+    while (true) {
+      pos = string.indexOf(subString, pos);
+      if (pos >= 0) {
+        ++n;
+        pos += step;
+      } else break;
+    }
+    return n;
+
+  }
+
+  function clear_variables(commit_count, all_commit_count, signed_commit_count){
+    commit_count = []
+    all_commit_count = {}
+    signed_commit_count = {}
+  }
+
+  function calculatePair(commits, repoName) {
+    let all_commit_count = {}
+    let signed_commit_count = {}
+
+    commits.forEach(function(commit) {
+      date = new Date(commit.commit.author.date)
+      date.setHours(date.getHours() - 3)
+      var month = date.getUTCMonth() + 1;
+      var day = date.getUTCDate();
+      var year = date.getUTCFullYear();
+
+      newdate = year + "/" + month + "/" + day;
+      if (!all_commit_count[newdate])
+        all_commit_count[newdate] = []
+      if (!signed_commit_count[newdate])
+        signed_commit_count[newdate] = 0
+      all_commit_count[newdate].push(commit.commit)
+
+      if (
+        (occurrences(commit.commit.message, ("Co-authored-by:")) > 1) ||
+        ((occurrences(commit.commit.message, ("Co-authored-by:")) == 1) && (commit.commit.message.indexOf(commit.commit.author.email))) ||
+        (occurrences(commit.commit.message, ("Signed-off-by:")) > 1) ||
+        ((occurrences(commit.commit.message, ("Signed-off-by:")) == 1) && (commit.commit.message.indexOf(commit.commit.author.email))) ||
+        ((commit.commit.author.email != commit.commit.committer.email) && ("noreply@github.com" != commit.commit.committer.email))
+      ) {
+
+        signed_commit_count[newdate] += 1
+      }
+    })
+    //
+    console.log(all_commit_count)
+    let commit_count = []
+    for (var key in all_commit_count) {
+      // console.log(key, all_commit_count[key].length);
+      commit_count.push(all_commit_count[key].length)
+    }
+    // console.log(signed_commit_count)
+
+
+    drawPlot(commit_count, all_commit_count, signed_commit_count, repoName)
+    clear_variables(commit_count, all_commit_count, signed_commit_count)
+
+  }
+
+  function drawPlot(commit_count, all_commit_count, signed_commit_count, repoName) {
+    TESTER = document.getElementById('tester');
+    Plotly.purge(TESTER);
+
+
+    var trace0 = {
+      x: Object.keys(all_commit_count),
+      y: commit_count,
+      name: 'All Commits'
+    }
+    var trace1 = {
+      x: Object.keys(signed_commit_count),
+      y: Object.values(signed_commit_count),
+      name: "Signed-Off-By Commits"
+    }
+    var data = [trace0, trace1]
+    title1 = "Pair programming evolution during project - " + repoName
+
+    var layout = {
+      title: title1,
+      xaxis: {
+        title: 'Date of commit'
+      },
+      yaxis: {
+        title: 'Amount of commits'
+      }
+    }
+
+
+    Plotly.plot(TESTER, data, layout)
+    clear_variables(commit_count, all_commit_count, signed_commit_count)
+
+
+
+  }
+</script>
